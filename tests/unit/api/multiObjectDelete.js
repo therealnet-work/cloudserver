@@ -9,6 +9,7 @@ const { ds } = require('../../../lib/data/in_memory/backend');
 const DummyRequest = require('../DummyRequest');
 const { bucketPut } = require('../../../lib/api/bucketPut');
 const objectPut = require('../../../lib/api/objectPut');
+const bucketPutACL = require('../../../lib/api/bucketPutACL');
 
 const log = new DummyRequestLogger();
 const canonicalID = 'accessKey1';
@@ -45,15 +46,12 @@ const testPutObjectRequest2 = new DummyRequest({
 const testPutObjectRequest3 = new DummyRequest({
     bucketName,
     namespace,
-    objectKey: objectKey2,
+    objectKey: objectKey3,
     headers: {},
     url: `/${bucketName}/${objectKey3}`,
 }, postBody);
 
 describe('getObjMetadataAndDelete function for multiObjectDelete', () => {
-    // let testPutObjectRequest1;
-    // let testPutObjectRequest2;
-    // let testPutObjectRequest3;
     const request = new DummyRequest({
         headers: {},
         parsedContentLength: contentLength,
@@ -82,16 +80,17 @@ describe('getObjMetadataAndDelete function for multiObjectDelete', () => {
 
         it('should successfully get object metadata and then ' +
             'delete metadata and data', done => {
-            getObjMetadataAndDelete(authInfo, 'foo', request, bucketName,
-            bucket, true, [], [{ key: objectKey1 }, { key: objectKey2 }], log,
+            getObjMetadataAndDelete(authInfo, authInfo.getCanonicalID(),
+            request, bucketName, bucket, true, [],
+            [{ key: objectKey1 }, { key: objectKey2 }], log,
             (err, quietSetting, errorResults, deletedObjStats) => {
                 assert.ifError(err);
                 assert.strictEqual(quietSetting, true);
                 assert.deepStrictEqual(errorResults, []);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
-                    numOfObjects, 2);
+                    numOfObjectsRemoved, 2);
                 assert.strictEqual(deletedObjStats.requesterNotObjOwner.
-                    numOfObjects, 0);
+                    numOfObjectsRemoved, 0);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
                     totalContentLengthDeleted, contentLength);
                 assert.strictEqual(deletedObjStats.requesterNotObjOwner.
@@ -111,16 +110,17 @@ describe('getObjMetadataAndDelete function for multiObjectDelete', () => {
         });
 
         it('should return success results if no such key', done => {
-            getObjMetadataAndDelete(authInfo, 'foo', request, bucketName,
-            bucket, true, [], [{ key: 'madeup1' }, { key: 'madeup2' }], log,
+            getObjMetadataAndDelete(authInfo, authInfo.getCanonicalID(),
+            request, bucketName, bucket, true, [],
+            [{ key: 'madeup1' }, { key: 'madeup2' }], log,
             (err, quietSetting, errorResults, deletedObjStats) => {
                 assert.ifError(err);
                 assert.strictEqual(quietSetting, true);
                 assert.deepStrictEqual(errorResults, []);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
-                    numOfObjects, 0);
+                    numOfObjectsRemoved, 0);
                 assert.strictEqual(deletedObjStats.requesterNotObjOwner.
-                    numOfObjects, 0);
+                    numOfObjectsRemoved, 0);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
                     totalContentLengthDeleted, 0);
                 assert.strictEqual(deletedObjStats.requesterNotObjOwner.
@@ -139,8 +139,9 @@ describe('getObjMetadataAndDelete function for multiObjectDelete', () => {
             // even though the getObjMetadataAndDelete function would
             // never be called if there was no bucket (would error out earlier
             // in API)
-            getObjMetadataAndDelete(authInfo, 'foo', request, 'madeupbucket',
-            bucket, true, [], [{ key: objectKey1 }, { key: objectKey2 }], log,
+            getObjMetadataAndDelete(authInfo, authInfo.getCanonicalID(),
+            request, 'madeupbucket', bucket, true, [],
+            [{ key: objectKey1 }, { key: objectKey2 }], log,
             (err, quietSetting, errorResults, deletedObjStats) => {
                 assert.ifError(err);
                 assert.strictEqual(quietSetting, true);
@@ -168,16 +169,16 @@ describe('getObjMetadataAndDelete function for multiObjectDelete', () => {
 
         it('should return no error or success results if no objects in play',
         done => {
-            getObjMetadataAndDelete(authInfo, 'foo', request, bucketName,
-            bucket, true, [], [], log,
+            getObjMetadataAndDelete(authInfo, authInfo.getCanonicalID(),
+            request, bucketName, bucket, true, [], [], log,
             (err, quietSetting, errorResults, deletedObjStats) => {
                 assert.ifError(err);
                 assert.strictEqual(quietSetting, true);
                 assert.deepStrictEqual(errorResults, []);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
-                    numOfObjects, 0);
+                    numOfObjectsRemoved, 0);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
-                    numOfObjects, 0);
+                    numOfObjectsRemoved, 0);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
                     totalContentLengthDeleted, 0);
                 assert.strictEqual(deletedObjStats.requesterNotObjOwner.
@@ -197,17 +198,17 @@ describe('getObjMetadataAndDelete function for multiObjectDelete', () => {
                     error: errors.AccessDenied,
                 },
             ];
-            getObjMetadataAndDelete(authInfo, 'foo', request, bucketName,
-            bucket, true, errorResultsSample,
+            getObjMetadataAndDelete(authInfo, authInfo.getCanonicalID(),
+            request, bucketName, bucket, true, errorResultsSample,
             [{ key: objectKey1 }, { key: objectKey2 }], log,
             (err, quietSetting, errorResults, deletedObjStats) => {
                 assert.ifError(err);
                 assert.strictEqual(quietSetting, true);
                 assert.deepStrictEqual(errorResults, errorResultsSample);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
-                    numOfObjects, 2);
+                    numOfObjectsRemoved, 2);
                 assert.strictEqual(deletedObjStats.requesterNotObjOwner.
-                    numOfObjects, 0);
+                    numOfObjectsRemoved, 0);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
                     totalContentLengthDeleted, contentLength);
                 assert.strictEqual(deletedObjStats.requesterNotObjOwner.
@@ -221,22 +222,47 @@ describe('getObjMetadataAndDelete function for multiObjectDelete', () => {
         beforeEach(done => {
             cleanup();
             bucketPut(authInfo, testBucketPutRequest, log, () => {
-                objectPut(authInfo, testPutObjectRequest1, undefined,
-                log, () => {
-                    objectPut(altAuthInfo, testPutObjectRequest2, undefined,
+                const testACLRequest = {
+                    bucketName,
+                    namespace,
+                    headers: { host: `${bucketName}.s3.amazonaws.com` },
+                    post: '<AccessControlPolicy xmlns=' +
+                            '"http://s3.amazonaws.com/doc/2006-03-01/">' +
+                          '<Owner>' +
+                            `<ID>${authInfo.getCanonicalID()}</ID>` +
+                            '<DisplayName>OwnerDisplayName</DisplayName>' +
+                          '</Owner>' +
+                          '<AccessControlList>' +
+                            '<Grant>' +
+                              '<Grantee xsi:type="CanonicalUser">' +
+                                `<ID>${altAuthInfo.getCanonicalID()}</ID>` +
+                                '<DisplayName>OwnerDisplayName</DisplayName>' +
+                              '</Grantee>' +
+                              '<Permission>WRITE</Permission>' +
+                            '</Grant>' +
+                          '</AccessControlList>' +
+                        '</AccessControlPolicy>',
+                    url: '/?acl',
+                    query: { acl: '' },
+                };
+                bucketPutACL(authInfo, testACLRequest, log, () => {
+                    objectPut(authInfo, testPutObjectRequest1, undefined,
                     log, () => {
-                        objectPut(altAuthInfo, testPutObjectRequest3, undefined,
+                        objectPut(altAuthInfo, testPutObjectRequest2, undefined,
                         log, () => {
-                            assert.strictEqual(metadata.keyMaps
-                                .get(bucketName)
-                                .has(objectKey1), true);
-                            assert.strictEqual(metadata.keyMaps
-                                .get(bucketName)
-                                .has(objectKey2), true);
-                            assert.strictEqual(metadata.keyMaps
-                                .get(bucketName)
-                                .has(objectKey3), true);
-                            done();
+                            objectPut(altAuthInfo, testPutObjectRequest3,
+                            undefined, log, () => {
+                                assert.strictEqual(metadata.keyMaps
+                                    .get(bucketName)
+                                    .has(objectKey1), true);
+                                assert.strictEqual(metadata.keyMaps
+                                    .get(bucketName)
+                                    .has(objectKey2), true);
+                                assert.strictEqual(metadata.keyMaps
+                                    .get(bucketName)
+                                    .has(objectKey3), true);
+                                done();
+                            });
                         });
                     });
                 });
@@ -245,17 +271,17 @@ describe('getObjMetadataAndDelete function for multiObjectDelete', () => {
 
         it('should successfully get object metadata and then ' +
         'delete metadata and data', done => {
-            getObjMetadataAndDelete(authInfo, 'foo', request, bucketName,
-            bucket, true, [],
+            getObjMetadataAndDelete(authInfo, authInfo.getCanonicalID(),
+            request, bucketName, bucket, true, [],
             [{ key: objectKey1 }, { key: objectKey2 }, { key: objectKey3 }],
             log, (err, quietSetting, errorResults, deletedObjStats) => {
                 assert.ifError(err);
                 assert.strictEqual(quietSetting, true);
                 assert.deepStrictEqual(errorResults, []);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
-                    numOfObjects, 1);
+                    numOfObjectsRemoved, 1);
                 assert.strictEqual(deletedObjStats.requesterNotObjOwner.
-                    numOfObjects, 2);
+                    numOfObjectsRemoved, 2);
                 assert.strictEqual(deletedObjStats.requesterIsObjOwner.
                     totalContentLengthDeleted, postBody.length);
                 assert.strictEqual(deletedObjStats.requesterNotObjOwner.
@@ -270,7 +296,7 @@ describe('getObjMetadataAndDelete function for multiObjectDelete', () => {
                 // that data deleted
                 setTimeout(() => {
                     // eslint-disable-next-line
-                    assert.deepStrictEqual(ds, [ , , , ]);
+                    assert.deepStrictEqual(ds, [ , , , , ]);
                     done();
                 }, 20);
             });
